@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+*.log
+
+# Java / Gradle
+build/
+.gradle/
+*.class
+*.jar
+
+# Node
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
