@@ -1,7 +1,10 @@
+import os
+from pathlib import Path
+
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-import os
+
 from .logger import logger
 
 load_dotenv()
@@ -23,9 +26,15 @@ async def on_ready():
 
 
 async def load_modules():
-    for filename in os.listdir("bot/modules"):
-        if filename.endswith(".py") and not filename.startswith("__"):
-            module = f"bot.modules.{filename[:-3]}"
+    modules_path = Path(__file__).parent.parent / "modules"
+
+    if not modules_path.exists():
+        logger.info(f"ℹ️ Modules directory not found at {modules_path}, skipping extension loading")
+        return
+
+    for filename in modules_path.iterdir():
+        if filename.suffix == ".py" and not filename.name.startswith("__"):
+            module = f"bot.modules.{filename.stem}"
             try:
                 await bot.load_extension(module)
                 logger.info(f"✅ Loaded module: {module}")
