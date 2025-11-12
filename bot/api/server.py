@@ -1,37 +1,42 @@
-from fastapi import FastAPI, Request
-import asyncio
+import os
+from typing import Any, Dict
+
+from fastapi import FastAPI, HTTPException, Request, status
+
 from bot.core.bot_client import bot
 from bot.core.logger import logger
-import os
 
 app = FastAPI()
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
 
 
+async def _resolve_channel():
+    channel = bot.get_channel(CHANNEL_ID)
+    if channel is None:
+        channel = await bot.fetch_channel(CHANNEL_ID)
+    return channel
+
+
 @app.post("/send")
-async def send_message(request: Request):
+async def send_message(request: Request) -> Dict[str, Any]:
+    if CHANNEL_ID <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="DISCORD_CHANNEL_ID is not configured",
+        )
+
     data = await request.json()
     msg = data.get("message", "Hello from API!")
 
-    async def _send():
-        try:
-            channel = bot.get_channel(CHANNEL_ID)
-            if channel is None:
-                channel = await bot.fetch_channel(CHANNEL_ID)
-            await channel.send(msg)
-            logger.info(f"📨 Message sent: {msg}")
-        except Exception as e:
-            logger.error(f"⚠️ Send error: {e}")
-
-    # Проверяем, что бот действительно запущен и loop активен
     if not bot.is_ready():
-        return {"status": "error", "detail": "Bot not ready"}
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Bot not ready")
 
     try:
-        future = asyncio.run_coroutine_threadsafe(_send(), bot.loop)
-        # Ждём результат (опционально — можно убрать .result() если не нужен блокирующий вызов)
-        future.result()
-        return {"status": "ok", "message": msg}
-    except Exception as e:
-        logger.error(f"⚠️ Exception submitting coroutine: {e}")
-        return {"status": "error", "detail": str(e)}
+        channel = await _resolve_channel()
+        await channel.send(msg)
+        logger.info(f"📨 Message sent: {msg}")
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("⚠️ Send error")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    return {"status": "ok", "message": msg}
